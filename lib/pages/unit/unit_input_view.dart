@@ -1,284 +1,363 @@
+
+import 'package:apt_option_calculator/pages/unit/unit_input_viewmodel.dart';
 import 'package:apt_option_calculator/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'unit_input_viewmodel.dart';
 
 class UnitInputView extends ConsumerStatefulWidget {
   const UnitInputView({super.key});
 
   @override
-  ConsumerState<UnitInputView> createState() => _UnitInputViewState();
+  ConsumerState<ConsumerStatefulWidget> createState() => _UnitInputViewState();
 }
 
-class _UnitInputViewState extends ConsumerState<UnitInputView> {
+class _UnitinputViewState extends ConsumerState<UnitInputState>
+with TickerProviderStateMixin{
+
+  final _formkey = GlobalKey<FormState>();
   final _dongController = TextEditingController();
   final _hosuController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+
+  late AnimationController _buttonAnimationController;
+  late Animation<double> _buttonScaleAnimation;
 
   @override
-  void dispose() {
+  void initState(){
+    super.initState();
+
+    //버튼 터치 애니메이션
+    _buttonAnimationController = AnimationController(
+      vsync: this,
+    duration: const Duration(milliseconds: 150),);
+
+_buttonScaleAnimation = Tween<double>(
+  begin: 1.0,
+  end: 0.95,
+).animate(CurvedAnimation(parent: _buttonAnimationController, curve: Curves.easeInOut,));
+  }
+
+  @override
+  void dispose(){
+    _buttonAnimationController.dispose();
     _dongController.dispose();
     _hosuController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(unitInputViewmodelProvider);
+  Widget build(BuildContext context){
+    final unitInputState = ref.watch(unitInputViewModelProvider);
 
     return Scaffold(
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: const Text('동/호수 입력'),
-        automaticallyImplyLeading: false,
-      ),
+        leading: Container(
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.cleanWhite.withValues(alpha: 0.2),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.menu,
+            color: AppColors.cleanWhite,
+            size: 20,
+          ),
+        ),
 
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                //안내텍스트
-                Text(
-                  '거주하실 동과 호수를 입력해주세요',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryDark,
-                  ),
-                ),
+        title: Text(
+          '금강펜테리움',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w300,
+            letterSpacing: 1.5,
+            color: AppColors.cleanWhite,
+          ),
+        ),
 
-                const SizedBox(height: 8),
+        centerTitle: true,
 
-                Text(
-                  '입력하신 정보를 바탕으로 선택 가능한 옵션을 확인할 수 있습니다.',
-                  style: TextStyle(fontSize: 14, color: AppColors.primaryLight),
-                ),
-                const SizedBox(height: 40),
-
-                //동입력
-                Text(
-                  '동',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryDark,
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _dongController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    hintText: '101',
-                    suffixText: '동',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isNotEmpty) {
-                      return '동을 입력해주세요';
-                    }
-                    if (int.tryParse(value.trim()) == null) {
-                      return '숫자만 입력해주세요';
-                    }
-                    return null;
-                  },
-                  onChanged: (value) {
-                    //입력이 변경될때마다 상태 업데이트
-                    ref
-                        .read(unitInputViewmodelProvider.notifier)
-                        .updateInput(
-                          _dongController.text,
-                          _hosuController.text,
-                        );
-                  },
-                ),
-
-                //호수입력
-                Text(
-                  '호수',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.primaryDark,
-                  ),
-                ),
-
-                SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _hosuController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    hintText: '1004',
-                    suffixText: '호수',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return '호수를 입력해주세요';
-                    }
-                    if (int.tryParse(value.trim()) == null) {
-                      return '숫자만 입력해주세요';
-                    }
-                    return null;
-                  },
-                  onChanged: (value) {
-                    // 입력이 변경될때마다 상태업데이트
-                    ref
-                        .read(unitInputViewmodelProvider.notifier)
-                        .updateInput(
-                          _hosuController.text,
-                          _hosuController.text,
-                        );
-                  },
-                ),
-
-                const SizedBox(height: 40),
-
-                //평형 정보 표시 (입력 완료 시)
-                if (state.unitType != null) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppColors.warmCream,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.luxuryGold, width: 1),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.home,
-                              color: AppColors.primaryDark,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '평형정보',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primaryDark,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 12),
-
-                        Text(
-                          '${state.dong}동 ${state.hosu}호',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primaryDark,
-                          ),
-                        ),
-
-                        const SizedBox(height: 4),
-
-                        Text(
-                          '${state.unitType} 타입',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.luxuryGold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-                ],
-
-                //에러메세지
-                if (state.error != null) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.error, width: 1),
-                    ),
-
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: AppColors.error,
-                          size: 20,
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        Expanded(
-                          child: Text(
-                            state.error!,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.error,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-                ],
-
-                const Spacer(),
-
-                // 다음 버튼
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: state.canProceed && !state.isLoading
-                        ? () => _handleNextButton()
-                        : null,
-                    child: state.isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : const Text(
-                            '옵션 선택하기',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
-                ),
-              ],
+        actions: [
+          Container(
+            margin: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.cleanWhite.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.person_outline,
+              color: AppColors.cleanWhite,
+              size: 20,
             ),
           ),
+        ],
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.primaryDark, AppColors.primaryMedium],
+            ),
+          ),
+        ),
+        elevation: 0,
+      ),
+
+      body: _buildMainContent(unitInputState),
+        );
+  }
+
+  Widget _buildMainContent(UnitInputState unitInputState){
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Form(
+        key: _formkey,
+        child: Column(
+          children: [
+            _buildInputField(
+              label: '동',
+              controller: _dongController,
+              supportingText :'동을 입력해주세요',
+              onChanged : (value){
+                ref.read(unitInputViewModelProvider.notifier).updateDong(value);
+            },
+            ),
+            const SizedBox(height: 28,),
+
+            _buildInputField(
+              label: '호수',
+              controller: _hosuController,
+              supprotingText: '호수를 입력해주세요',
+              onChanged: (value){
+                ref.read(unitInputViewModelProvider.notifier).updateHosu(value);
+              },
+            ),
+
+            const SizedBox(height: 28,),
+
+            _buildNameField(
+              label: '계약자명',
+              controller: _nameController,
+              supportingText: '계약자명을 입력해주세요',
+              onChanged:(value){
+                ref.read(unitInputViewModelProvider.notifier).updateName(value);
+              },
+            ),
+
+            // 평형 정보 표시
+            if(unitInputViewModelProvider.unitType != null) ...[
+              const SizedBox(height: 20,),
+              _buildUnitTypeCard(unitInputState.unitType!),
+            ],
+
+            //에러 메시지 표시
+            if(unitInputState.error != null) ...[
+              const SizedBox(height: 20,),
+            ],
+
+            const SizedBox(height: 40,),
+            _buildContinueButton(unitInputState),
+            const SizedBox(height: 20,),
+
+          ],
         ),
       ),
     );
   }
 
-  void _handleNextButton() {
-    if (_formKey.currentState!.validate()) {
-      final dong = _dongController.text.trim();
-      final hosu = _hosuController.text.trim();
+  Widget _buildInputField({
+    required String label,
+    required TextEditingController controller,
+    required String supportingText,
+    required Function(String) onChanged,
+}){
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.cleanWhite,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.lightBeige,
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.luxuryGold.withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0,2),
+              ),
+            ],
+          ),
 
-      ref.read(unitInputViewmodelProvider.notifier).findUnitType(dong, hosu);
-    }
+          child: Stack(
+            children: [
+              //floating label
+              Positioned(
+                top: -10,
+                left:16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  color: AppColors.cleanWhite,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize:13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primaryMedium,
+                    ),
+                  ),
+                ),
+              ),
+
+              // InputField
+              TextFormField(
+                controller: controller,
+                onChanged: onChanged,
+                keyboardType: label == '계약자명' ? TextInputType.text : TextInputType.number,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.primaryDark,
+                ),
+
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.fromLTRB(18,18,55,18),
+                  border: InputBorder.none,
+                  hintText: '',
+                ),
+                validator: (value){
+                  if(value == null || value.isNotEmpty)
+                    return '$label을(를) 입력해주세요';
+                  return null;
+                },
+              ),
+
+              //clear button
+              if (controller.text.isNotEmpty)
+                Positioned(
+                    right: 12,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap:(){
+                          controller.clear();
+                          onChanged('');
+                        },
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight.withValues(alpha: 0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 12,
+                            color: AppColors.cleanWhite,
+                          ),
+                        ),
+                      ),
+                    ),
+                ),
+
+
+
+            ],
+          ),
+
+        ),
+
+        const SizedBox( height: 6,),
+
+        Padding(
+            padding: const EdgeInsets.only(left:18),
+        child: Text(
+          supportingText,
+          style: TextStyle(
+            fontSize: 11,
+            color:AppColors.primaryLight,
+            height: 1.3,
+          ),
+        ),
+        ),
+      ],
+    );
   }
+
+  Widget _buildunitTypeCard(String unitType){
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.luxuryGold.withValues(alpha: 0.1),
+            AppColors.primaryLight.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.luxuryGold.withValues(alpha: 0.3))
+      ),
+
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.luxuryGold,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.home_outlined,
+              color: AppColors.cleanWhite,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12,),
+          Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '평형 확인됨',
+                    style: TextStyle(
+                      color: AppColors.primaryMedium,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  const SizedBox(height: 2,),
+                  Text(unitType,
+                  style: TextStyle(
+                    color: AppColors.primaryDark,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                  ),
+                ],
+
+          ),
+          ),
+          Icon(
+            Icons.check_circle,
+            color: AppColors.luxuryGold,
+            size: 24,
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+      )
+
+
+
+
+
 }

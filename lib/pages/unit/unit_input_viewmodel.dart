@@ -4,14 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class UnitInputState {
   final String dong;
   final String hosu;
+  final String? name;
   final String? unitType;
   final bool isLoading;
   final String? error;
   final bool canProceed;
 
+
   const UnitInputState({
     this.dong = '',
     this.hosu = '',
+    this.name = '',
     this.unitType,
     this.isLoading = false,
     this.error,
@@ -38,8 +41,8 @@ class UnitInputState {
 }
 
 // ViewModel 클래스
-class UnitInputViewmodel extends StateNotifier<UnitInputState> {
-  UnitInputViewmodel() : super(const UnitInputState());
+class UnitInputViewModel extends StateNotifier<UnitInputState> {
+  UnitInputViewModel() : super(const UnitInputState());
 
   // 입력 업데이트
   void updateInput(String dong, String hosu) {
@@ -133,7 +136,7 @@ class UnitInputViewmodel extends StateNotifier<UnitInputState> {
 }
 
 // Provider
-final unitInputViewmodelProvider =
-    StateNotifierProvider<UnitInputViewmodel, UnitInputState>((ref) {
-      return UnitInputViewmodel();
+final unitInputViewModelProvider =
+    StateNotifierProvider<UnitInputViewModel, UnitInputState>((ref) {
+      return UnitInputViewModel();
     });
