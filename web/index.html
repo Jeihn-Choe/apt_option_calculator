@@ -1,38 +1,54 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
+    <base href="/">
+    <meta charset="UTF-8">
+    <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+    <meta content="아파트 견적 시스템" name="description">
+    <meta content="yes" name="apple-mobile-web-app-capable">
+    <meta content="black" name="apple-mobile-web-app-status-bar-style">
+    <meta content="아파트 견적" name="apple-mobile-web-app-title">
+    <meta content="#2F3BA2" name="msapplication-TileColor">
+    <meta content="#2F3BA2" name="theme-color">
 
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
+    <title>아파트 견적 시스템</title>
+    <link href="manifest.json" rel="manifest">
 
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+    <script>
+        // Flutter 웹 PWA 지원
+        var serviceWorkerVersion = null;
+        var scriptLoaded = false;
+        function loadMainDartJs() {
+          if (scriptLoaded) {
+            return;
+          }
+          scriptLoaded = true;
+          var scriptTag = document.createElement('script');
+          scriptTag.src = 'main.dart.js';
+          scriptTag.type = 'application/javascript';
+          document.body.append(scriptTag);
+        }
 
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="$FLUTTER_BASE_HREF">
-
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="apt_option_calculator">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>apt_option_calculator</title>
-  <link rel="manifest" href="manifest.json">
+        if ('serviceWorker' in navigator) {
+          serviceWorkerVersion = '1';
+          navigator.serviceWorker.register('flutter_service_worker.js?v=' + serviceWorkerVersion);
+        }
+    </script>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+<script defer src="flutter.js"></script>
+<script>
+    window.addEventListener('load', function(ev) {
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        }
+      }).then(function(engineInitializer) {
+        return engineInitializer.initializeEngine();
+      }).then(function(appRunner) {
+        return appRunner.runApp();
+      });
+    });
+</script>
 </body>
 </html>
