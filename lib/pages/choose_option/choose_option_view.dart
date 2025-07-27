@@ -29,6 +29,7 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
   @override
   void initState() {
     super.initState();
+
     // Provider 초기화
     provider = chooseOptionViewModelProvider({
       'dong': widget.dong,
@@ -48,27 +49,55 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
       body: Column(
         children: [
           Expanded(
-            child: Column(
-              children: [
-                _buildTypeSelection(state),
-                Expanded(child: _buildOptionsList(state)),
-              ],
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 120), // 플로팅 바텀 공간 확보
+              child: Column(
+                children: [
+                  // 타입별 금액 표시 카드
+                  _buildExpansionPriceCard(state),
+
+                  // 가변형 벽체 선택 섹션
+                  _buildTypeSelection(state),
+
+                  // 세부 옵션 섹션 (나중에 구현)
+                  if (state.isTypeConfirmed) _buildOptionsPlaceholder(),
+
+                  // 견적서 확인 버튼
+                  _buildNextButtonContainer(state),
+                ],
+              ),
             ),
           ),
-          _buildPriceSummary(state),
         ],
       ),
+      floatingActionButton: null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomSheet: _buildPriceSummary(state),
     );
   }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      leading: _buildIconButton(Icons.arrow_back_ios),
+      leading: GestureDetector(
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.2),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.arrow_back_ios,
+            color: AppColors.cleanWhite,
+            size: 20,
+          ),
+        ),
+      ),
       title: Column(
         children: [
           Text(
             '${widget.dong}동 ${widget.hosu}호 ${widget.unitType}',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
               color: AppColors.cleanWhite,
@@ -78,7 +107,7 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
             Text(
               '${widget.name} 고객님',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w300,
                 color: AppColors.cleanWhite.withValues(alpha: 0.9),
               ),
@@ -87,7 +116,7 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
       ),
       centerTitle: true,
       flexibleSpace: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -99,21 +128,128 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
     );
   }
 
-  Widget _buildIconButton(IconData icon) {
+  // 발코니 확장 가격 카드
+  Widget _buildExpansionPriceCard(ChooseOptionState state) {
     return Container(
-      margin: const EdgeInsets.all(12),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.luxuryGold, AppColors.primaryLight],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.luxuryGold.withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Icon(icon, color: AppColors.cleanWhite, size: 20),
+      child: Stack(
+        children: [
+          // 배경 글로우 효과
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.0),
+                    Colors.white.withValues(alpha: 0.1),
+                    Colors.white.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        state.expansionTitle,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.cleanWhite,
+                          shadows: [
+                            Shadow(
+                              offset: Offset(0, 1),
+                              blurRadius: 2,
+                              color: Colors.black26,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${state.unitType} 타입',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.cleanWhite.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '${_formatPrice(state.expansionPrice)}원',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.cleanWhite,
+                      shadows: [
+                        Shadow(
+                          offset: Offset(0, 1),
+                          blurRadius: 2,
+                          color: Colors.black26,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                state.expansionDescription,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.cleanWhite.withValues(alpha: 0.8),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTypeSelection(ChooseOptionState state) {
     return Container(
-      padding: const EdgeInsets.all(24),
-      color: AppColors.cleanWhite,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.cleanWhite,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -123,18 +259,18 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(color: AppColors.primaryLight, width: 1),
-                bottom: BorderSide(color: AppColors.primaryLight, width: 1),
+                top: BorderSide(color: AppColors.primaryLight),
+                bottom: BorderSide(color: AppColors.primaryLight),
               ),
             ),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    '가변형 벽체 선택 (${state.unitType})',
+                    '가변형 벽체 선택',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
+                    style: const TextStyle(
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: AppColors.primaryDark,
                     ),
@@ -148,12 +284,12 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.luxuryGold,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Text(
+                    child: const Text(
                       '확정',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: AppColors.cleanWhite,
                       ),
@@ -162,7 +298,7 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           // 평형별 조건부 렌더링
           if (state.is84Type) ...[
@@ -173,35 +309,51 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
             _build61or63TypeOptions(state),
           ],
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           // 확정/재설정 버튼
-          Row(
-            children: [
-              if (!state.isTypeConfirmed) ...[
-                Expanded(
-                  child: _buildConfirmButton(
-                    '확정',
-                    () => ref.read(provider.notifier).confirmTypeSelection(),
-                  ),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: state.isTypeConfirmed
+                  ? () => ref.read(provider.notifier).resetTypeSelection()
+                  : () => ref.read(provider.notifier).confirmTypeSelection(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: state.isTypeConfirmed
+                    ? AppColors.primaryLight.withValues(alpha: 0.8)
+                    : AppColors.luxuryGold,
+                foregroundColor: AppColors.cleanWhite,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ] else ...[
-                Expanded(
-                  child: _buildConfirmButton(
-                    '재설정',
-                    () => ref.read(provider.notifier).resetTypeSelection(),
-                    isReset: true,
+                elevation: 4,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    state.isTypeConfirmed ? Icons.refresh : Icons.check,
+                    size: 16,
                   ),
-                ),
-              ],
-            ],
+                  const SizedBox(width: 6),
+                  Text(
+                    state.isTypeConfirmed ? '재설정' : '확정',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // 84평형 전용 옵션들 (기존 두 행)
+  // 84평형 전용 옵션들
   Widget _build84TypeOptions(ChooseOptionState state) {
     return Column(
       children: [
@@ -220,7 +372,7 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
                 isDisabled: state.isTypeConfirmed,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: _buildRadioButton(
                 '거실통합형',
@@ -235,7 +387,7 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // 두 번째 라디오 그룹: 알파룸 타입
         Row(
@@ -252,7 +404,7 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
                 isDisabled: state.isTypeConfirmed,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: _buildRadioButton(
                 '거실통합형',
@@ -271,39 +423,31 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
     );
   }
 
-  // 61,63평형 전용 옵션들 (새로 추가된 한 행)
+  // 61,63평형 전용 옵션들
   Widget _build61or63TypeOptions(ChooseOptionState state) {
-    return Column(
+    return Row(
       children: [
-        // 침실2 타입 선택
-        Row(
-          children: [
-            Expanded(
-              child: _buildRadioButton(
-                '침실2분리형',
-                state.bedroom2Type == '침실2분리형',
-                state.isTypeConfirmed
-                    ? null
-                    : () => ref
-                          .read(provider.notifier)
-                          .selectBedroom2Type('침실2분리형'),
-                isDisabled: state.isTypeConfirmed,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildRadioButton(
-                '거실통합형',
-                state.bedroom2Type == '거실통합형',
-                state.isTypeConfirmed
-                    ? null
-                    : () => ref
-                          .read(provider.notifier)
-                          .selectBedroom2Type('거실통합형'),
-                isDisabled: state.isTypeConfirmed,
-              ),
-            ),
-          ],
+        Expanded(
+          child: _buildRadioButton(
+            '침실2분리형',
+            state.bedroom2Type == '침실2분리형',
+            state.isTypeConfirmed
+                ? null
+                : () =>
+                      ref.read(provider.notifier).selectBedroom2Type('침실2분리형'),
+            isDisabled: state.isTypeConfirmed,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildRadioButton(
+            '거실통합형',
+            state.bedroom2Type == '거실통합형',
+            state.isTypeConfirmed
+                ? null
+                : () => ref.read(provider.notifier).selectBedroom2Type('거실통합형'),
+            isDisabled: state.isTypeConfirmed,
+          ),
         ),
       ],
     );
@@ -318,7 +462,7 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         decoration: BoxDecoration(
           color: isDisabled
               ? (isSelected
@@ -350,8 +494,8 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
           children: [
             // 라디오 버튼
             Container(
-              width: 20,
-              height: 20,
+              width: 18,
+              height: 18,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
@@ -369,8 +513,8 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
               child: isSelected
                   ? Center(
                       child: Container(
-                        width: 10,
-                        height: 10,
+                        width: 9,
+                        height: 9,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isDisabled
@@ -414,87 +558,14 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
     );
   }
 
-  Widget _buildConfirmButton(
-    String title,
-    VoidCallback onTap, {
-    bool isReset = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          gradient: isReset
-              ? null
-              : LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.luxuryGold, AppColors.primaryLight],
-                ),
-          color: isReset ? AppColors.primaryLight.withValues(alpha: 0.8) : null,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: (isReset ? AppColors.primaryLight : AppColors.luxuryGold)
-                  .withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isReset ? Icons.refresh : Icons.check,
-              color: AppColors.cleanWhite,
-              size: 16,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.cleanWhite,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOptionsList(ChooseOptionState state) {
+  // 옵션 섹션 플레이스홀더 (나중에 구현)
+  Widget _buildOptionsPlaceholder() {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.offWhite,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-      ),
-      child: ListView.builder(
-        padding: const EdgeInsets.all(24),
-        itemCount: state.options.length,
-        itemBuilder: (context, index) {
-          final option = state.options[index];
-          return _buildOptionItem(option);
-        },
-      ),
-    );
-  }
-
-  Widget _buildOptionItem(OptionItem option) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.cleanWhite,
         borderRadius: BorderRadius.circular(16),
-        border: option.isSelected
-            ? Border.all(color: AppColors.luxuryGold, width: 2)
-            : null,
         boxShadow: [
           BoxShadow(
             color: AppColors.primaryDark.withValues(alpha: 0.08),
@@ -503,236 +574,181 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
           ),
         ],
       ),
-      child: InkWell(
-        onTap: () => ref.read(provider.notifier).toggleOption(option.id),
-        borderRadius: BorderRadius.circular(16),
-        child: Row(
-          children: [
-            // 체크박스
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: option.isSelected
-                    ? AppColors.luxuryGold
-                    : Colors.transparent,
-                border: Border.all(
-                  color: option.isSelected
-                      ? AppColors.luxuryGold
-                      : AppColors.primaryLight,
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: option.isSelected
-                  ? const Icon(
-                      Icons.check,
-                      color: AppColors.cleanWhite,
-                      size: 16,
-                    )
-                  : null,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.lightBeige,
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(width: 16),
-
-            // 옵션 정보
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.construction,
+                  color: AppColors.primaryMedium,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          option.title,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.primaryDark,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '+${_formatPrice(option.price)}원',
+                      const Text(
+                        '세부 옵션 선택',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                           color: AppColors.primaryDark,
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '가변형 벽체가 확정되었습니다.\n세부 옵션 선택 기능을 준비 중입니다.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.primaryLight,
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    option.description,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.primaryLight,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 견적서 확인 버튼
+  Widget _buildNextButtonContainer(ChooseOptionState state) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: state.isLoading ? null : _handleNextPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.luxuryGold,
+            foregroundColor: AppColors.cleanWhite,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(25),
+            ),
+            elevation: 6,
+          ),
+          child: state.isLoading
+              ? const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.cleanWhite,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      '저장 중...',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                )
+              : const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '견적서 확인',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Icon(Icons.arrow_forward_ios, size: 16),
+                  ],
+                ),
         ),
       ),
     );
   }
 
+  // 플로팅 가격 요약
   Widget _buildPriceSummary(ChooseOptionState state) {
     return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [AppColors.primaryDark, AppColors.primaryMedium],
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 20,
+            offset: Offset(0, -4),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // 선택된 옵션 수
-            if (state.options.where((o) => o.isSelected).isNotEmpty) ...[
-              Row(
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    color: AppColors.luxuryGold,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${state.options.where((o) => o.isSelected).length}개 옵션 선택',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.luxuryGold,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            // 총액
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   '총액',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: AppColors.cleanWhite,
                   ),
                 ),
                 Text(
                   '${_formatPrice(state.totalPrice)}원',
-                  style: TextStyle(
-                    fontSize: 20,
+                  style: const TextStyle(
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.cleanWhite,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-
-            // 계약금
+            const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   '계약금 10%',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: AppColors.luxuryGold,
                   ),
                 ),
                 Text(
                   '${_formatPrice(state.contractPrice)}원',
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: const TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: AppColors.luxuryGold,
                   ),
                 ),
               ],
             ),
-
-            // 다음 버튼
-            const SizedBox(height: 20),
-            _buildNextButton(state),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildNextButton(ChooseOptionState state) {
-    return GestureDetector(
-      onTap: state.isLoading ? null : _handleNextPressed,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: AppColors.luxuryGold,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.luxuryGold.withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: state.isLoading
-            ? Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.cleanWhite,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '저장 중...',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.cleanWhite,
-                    ),
-                  ),
-                ],
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '견적서 확인',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.cleanWhite,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 18,
-                    color: AppColors.cleanWhite,
-                  ),
-                ],
-              ),
       ),
     );
   }
@@ -742,7 +758,7 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
 
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('✅ 선택 완료! 견적서 페이지로 이동합니다.'),
           backgroundColor: AppColors.luxuryGold,
           behavior: SnackBarBehavior.floating,

@@ -125,7 +125,7 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
             ],
 
             const SizedBox(height: 40),
-            _buildContinueButton(state),
+            _buildActionButton(state),
           ],
         ),
       ),
@@ -139,19 +139,21 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
     required TextInputType keyboardType,
     required Function(String) onChanged,
   }) {
-    final isLoading = ref.watch(unitInputViewModelProvider).isLoading;
+    final state = ref.watch(unitInputViewModelProvider);
+    final isLoading = state.isLoading;
+    final isLocked = state.isLocked && (label == '동' || label == '호수');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           decoration: BoxDecoration(
-            color: isLoading
+            color: (isLoading || isLocked)
                 ? AppColors.lightBeige.withValues(alpha: 0.5)
                 : AppColors.cleanWhite,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isLoading
+              color: (isLoading || isLocked)
                   ? AppColors.lightBeige.withValues(alpha: 0.5)
                   : AppColors.lightBeige,
               width: 1.5,
@@ -159,7 +161,7 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
             boxShadow: [
               BoxShadow(
                 color: AppColors.luxuryGold.withValues(
-                  alpha: isLoading ? 0.05 : 0.1,
+                  alpha: (isLoading || isLocked) ? 0.05 : 0.1,
                 ),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
@@ -177,18 +179,31 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
                     horizontal: 8,
                     vertical: 2,
                   ),
-                  color: isLoading
+                  color: (isLoading || isLocked)
                       ? AppColors.lightBeige.withValues(alpha: 0.5)
                       : AppColors.cleanWhite,
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: isLoading
-                          ? AppColors.primaryLight.withValues(alpha: 0.5)
-                          : AppColors.primaryMedium,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: (isLoading || isLocked)
+                              ? AppColors.primaryLight.withValues(alpha: 0.5)
+                              : AppColors.primaryMedium,
+                        ),
+                      ),
+                      if (isLocked) ...[
+                        SizedBox(width: 4),
+                        Icon(
+                          Icons.lock,
+                          size: 12,
+                          color: AppColors.primaryLight.withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -198,12 +213,11 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
                 controller: controller,
                 onChanged: onChanged,
                 keyboardType: keyboardType,
-                enabled: !isLoading,
-                // 🔧 로딩 중 비활성화
+                enabled: !isLoading && !isLocked,
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w400,
-                  color: isLoading
+                  color: (isLoading || isLocked)
                       ? AppColors.primaryLight.withValues(alpha: 0.5)
                       : AppColors.primaryDark,
                 ),
@@ -212,7 +226,6 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
                   border: InputBorder.none,
                 ),
                 validator: (value) {
-                  // 🔧 계약자명은 선택사항으로 변경
                   if (label != '계약자명' && (value?.isEmpty ?? true)) {
                     return '$label을(를) 입력해주세요';
                   }
@@ -220,8 +233,8 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
                 },
               ),
 
-              // Clear Button
-              if (controller.text.isNotEmpty && !isLoading)
+              // Clear Button (잠금 상태가 아닐 때만 표시)
+              if (controller.text.isNotEmpty && !isLoading && !isLocked)
                 Positioned(
                   right: 12,
                   top: 0,
@@ -248,6 +261,36 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
                     ),
                   ),
                 ),
+
+              // Reset Button (잠금 상태일 때만 표시)
+              if (isLocked)
+                Positioned(
+                  right: 12,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () {
+                        ref
+                            .read(unitInputViewModelProvider.notifier)
+                            .resetForNewSearch();
+                      },
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: AppColors.luxuryGold.withValues(alpha: 0.8),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit,
+                          size: 12,
+                          color: AppColors.cleanWhite,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -255,10 +298,10 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
         Padding(
           padding: const EdgeInsets.only(left: 18),
           child: Text(
-            supportingText,
+            isLocked ? '조회 완료 (수정하려면 편집 버튼을 눌러주세요)' : supportingText,
             style: TextStyle(
               fontSize: 11,
-              color: isLoading
+              color: (isLoading || isLocked)
                   ? AppColors.primaryLight.withValues(alpha: 0.5)
                   : AppColors.primaryLight,
               height: 1.3,
@@ -312,7 +355,7 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  unitType,
+                  '🏠 ${unitType} Type',
                   style: TextStyle(
                     color: AppColors.primaryDark,
                     fontWeight: FontWeight.w600,
@@ -380,27 +423,29 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
     );
   }
 
-  Widget _buildContinueButton(UnitInputState state) {
-    final canContinue = state.canProceed && !state.isLoading;
+  Widget _buildActionButton(UnitInputState state) {
+    final canSearch = state.canSearch;
+    final canProceed = state.canProceed;
+    final isEnabled = canSearch || canProceed;
 
     return GestureDetector(
-      onTap: canContinue ? _handleContinuePressed : null,
+      onTap: isEnabled ? _handleActionPressed : null,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          gradient: canContinue
+          gradient: isEnabled
               ? LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [AppColors.luxuryGold, AppColors.primaryLight],
                 )
               : null,
-          color: canContinue
+          color: isEnabled
               ? null
               : AppColors.primaryLight.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(25),
-          boxShadow: canContinue
+          boxShadow: isEnabled
               ? [
                   BoxShadow(
                     color: AppColors.luxuryGold.withValues(alpha: 0.3),
@@ -439,20 +484,20 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '계속하기',
+                    canProceed ? '계속하기' : '조회하기',
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
-                      color: canContinue
+                      color: isEnabled
                           ? AppColors.cleanWhite
                           : AppColors.primaryLight,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Icon(
-                    Icons.arrow_forward_ios,
+                    canProceed ? Icons.arrow_forward_ios : Icons.search,
                     size: 18,
-                    color: canContinue
+                    color: isEnabled
                         ? AppColors.cleanWhite
                         : AppColors.primaryLight,
                   ),
@@ -462,38 +507,40 @@ class _UnitInputViewState extends ConsumerState<UnitInputView> {
     );
   }
 
-  Future<void> _handleContinuePressed() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _handleActionPressed() async {
+    final state = ref.read(unitInputViewModelProvider);
 
-    final success = await ref
-        .read(unitInputViewModelProvider.notifier)
-        .validateAndProceed();
+    if (state.canProceed) {
+      // 계속하기 버튼 클릭 - 다음 페이지로 이동
+      if (!_formKey.currentState!.validate()) return;
 
-    if (success && mounted) {
-      // 🔧 현재 상태 가져오기
-      final state = ref.read(unitInputViewModelProvider);
+      final success = await ref
+          .read(unitInputViewModelProvider.notifier)
+          .validateAndProceed();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ 평형 확인 완료! 옵션 선택 페이지로 이동합니다.'),
-          backgroundColor: AppColors.luxuryGold,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      // ✅ 다음 페이지로 이동
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => ChooseOptionView(
-            dong: state.dong,
-            hosu: state.hosu,
-            name: state.name,
-            unitType: state.unitType!,
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ 타입 확인 완료! 옵션 선택 페이지로 이동합니다.'),
+            backgroundColor: AppColors.luxuryGold,
+            behavior: SnackBarBehavior.floating,
           ),
-        ),
-      );
-      // TODO: Navigate to next page
-      // GoRouter.of(context).go('/option-selection');
+        );
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ChooseOptionView(
+              dong: state.dong,
+              hosu: state.hosu,
+              name: state.name,
+              unitType: state.unitType!,
+            ),
+          ),
+        );
+      }
+    } else if (state.canSearch) {
+      // 조회하기 버튼 클릭 - 유닛 타입 조회
+      await ref.read(unitInputViewModelProvider.notifier).searchUnitType();
     }
   }
 }

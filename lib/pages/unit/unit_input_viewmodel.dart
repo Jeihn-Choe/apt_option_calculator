@@ -1,158 +1,260 @@
+// unit_input_viewmodel.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// State 클래스
+// 새로 추가된 import
+import '../../repositories/dong_hosu_type_rawdata.dart';
+
+/// 유닛 입력 화면의 상태 모델
 class UnitInputState {
   final String dong;
   final String hosu;
-  final String? name;
-  final String? unitType; // 조회 성공 시에만 설정
-  final bool isLoading;
+  final String name;
+  final String? unitType;
   final String? error;
-  final bool canProceed; // 입력만 완료되면 true
+  final bool isLoading;
+  final bool isLocked; // 조회 성공 후 잠금 상태
 
   const UnitInputState({
     this.dong = '',
     this.hosu = '',
-    this.name,
+    this.name = '',
     this.unitType,
-    this.isLoading = false,
     this.error,
-    this.canProceed = false,
+    this.isLoading = false,
+    this.isLocked = false,
   });
+
+  /// 조회 가능한지 확인 (동, 호수 입력됨 + 잠금되지 않음)
+  bool get canSearch =>
+      dong.isNotEmpty && hosu.isNotEmpty && !isLoading && !isLocked;
+
+  /// 다음 단계로 진행 가능한지 확인 (조회 성공 + 잠금됨)
+  bool get canProceed => unitType != null && !isLoading && isLocked;
 
   UnitInputState copyWith({
     String? dong,
     String? hosu,
     String? name,
     String? unitType,
-    bool? isLoading,
     String? error,
-    bool? canProceed,
+    bool? isLoading,
+    bool? isLocked,
   }) {
     return UnitInputState(
       dong: dong ?? this.dong,
       hosu: hosu ?? this.hosu,
       name: name ?? this.name,
       unitType: unitType ?? this.unitType,
-      isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
-      canProceed: canProceed ?? this.canProceed,
+      isLoading: isLoading ?? this.isLoading,
+      isLocked: isLocked ?? this.isLocked,
     );
+  }
+
+  @override
+  String toString() {
+    return 'UnitInputState(dong: $dong, hosu: $hosu, name: $name, unitType: $unitType, error: $error, isLoading: $isLoading)';
   }
 }
 
-// ViewModel 클래스
-class UnitInputViewmodel extends StateNotifier<UnitInputState> {
-  UnitInputViewmodel() : super(const UnitInputState());
+/// 유닛 입력 ViewModel
+class UnitInputViewModel extends StateNotifier<UnitInputState> {
+  UnitInputViewModel() : super(const UnitInputState());
 
-  // 개별 업데이트 메서드들
+  /// 동 번호 업데이트
   void updateDong(String dong) {
+    // 잠금 상태에서는 수정 불가
+    if (state.isLocked) return;
+
     state = state.copyWith(
       dong: dong,
-      error: null, // 입력 시 에러 초기화
-      unitType: null, // 입력 변경 시 이전 조회 결과 초기화
+      unitType: null, // 동이 변경되면 기존 유닛 타입 초기화
+      error: null, // 에러 초기화
     );
-    _updateCanProceed();
   }
 
+  /// 호수 업데이트
   void updateHosu(String hosu) {
-    state = state.copyWith(hosu: hosu, error: null, unitType: null);
-    _updateCanProceed();
+    // 잠금 상태에서는 수정 불가
+    if (state.isLocked) return;
+
+    state = state.copyWith(
+      hosu: hosu,
+      unitType: null, // 호수가 변경되면 기존 유닛 타입 초기화
+      error: null, // 에러 초기화
+    );
   }
 
-  void updateName(String name) {
-    state = state.copyWith(name: name, error: null);
-  }
+  /// 수동으로 유닛 타입 조회
+  Future<void> searchUnitType() async {
+    // 조회 시작 시 에러 카드 즉시 제거
+    state = state.copyWith(error: null);
+    clearError();
 
-  // 진행 가능 여부 업데이트 (입력만 체크)
-  void _updateCanProceed() {
-    final canProceed = state.dong.isNotEmpty && state.hosu.isNotEmpty;
-    // unitType 체크 제거!
+    final dong = state.dong.trim();
+    final hosu = state.hosu.trim();
 
-    state = state.copyWith(canProceed: canProceed);
-  }
+    if (dong.isEmpty || hosu.isEmpty) {
+      state = state.copyWith(error: '동과 호수를 모두 입력해주세요.');
+      return;
+    }
 
-  // 🔥 새로운 메서드: 계속하기 버튼 클릭 시 호출
-  Future<bool> validateAndProceed() async {
-    if (!state.canProceed) return false;
-
-    state = state.copyWith(isLoading: true, error: null);
+    // 로딩 상태 시작
+    state = state.copyWith(isLoading: true, error: null, unitType: null);
 
     try {
-      // DB 조회 시뮬레이션
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      final unitType = _getMockUnitType(state.dong, state.hosu);
+      // 실제 데이터에서 조회
+      final unitType = DongHosuTypeRawdata.getUnitType(dong, hosu);
 
       if (unitType != null) {
-        // ✅ 성공: 평형 정보 설정
         state = state.copyWith(
-          isLoading: false,
           unitType: unitType,
-          error: null,
-        );
-
-        print('✅ 조회 성공: ${state.dong}동 ${state.hosu}호 ($unitType 타입)');
-        return true; // 다음 페이지로 이동 가능
-      } else {
-        // ❌ 실패: 에러 메시지 설정
-        state = state.copyWith(
           isLoading: false,
-          error: '해당 동/호수 정보를 찾을 수 없습니다.\n입력하신 정보를 다시 확인해주세요.',
-          unitType: null,
+          error: null,
+          isLocked: true, // 조회 성공 시 잠금
         );
-
-        print('❌ 조회 실패: ${state.dong}동 ${state.hosu}호');
-        return false; // 현재 페이지에 머물기
+      } else {
+        // 실패: 해당 동/호수 조합이 없음
+        state = state.copyWith(
+          unitType: null,
+          isLoading: false,
+          error: '입력하신 동/호수 정보를 찾을 수 없습니다.\n동과 호수를 다시 확인해주세요.',
+          isLocked: false,
+        );
       }
     } catch (e) {
-      // 🔥 네트워크/서버 에러
+      // 예외 처리
       state = state.copyWith(
-        isLoading: false,
-        error: '서버 연결에 실패했습니다.\n잠시 후 다시 시도해주세요.',
         unitType: null,
+        isLoading: false,
+        error: '조회 중 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.',
+        isLocked: false,
       );
-
-      print('🔥 서버 에러: $e');
-      return false;
     }
   }
 
-  // 에러 메시지 초기화
+  /// 잠금 해제 및 재조회 가능하도록 초기화
+  void resetForNewSearch() {
+    state = state.copyWith(unitType: null, error: null, isLocked: false);
+  }
+
+  /// 계약자명 업데이트
+  void updateName(String name) {
+    state = state.copyWith(name: name);
+  }
+
+  /// 에러 메시지 초기화
   void clearError() {
     state = state.copyWith(error: null);
   }
 
-  // 입력 초기화 (필요시)
-  void reset() {
-    state = const UnitInputState();
+  /// 유닛 타입 조회 (실제 데이터 사용)
+  Future<void> _lookupUnitType() async {
+    final dong = state.dong.trim();
+    final hosu = state.hosu.trim();
+
+    // 입력값이 비어있으면 조회하지 않음
+    if (dong.isEmpty || hosu.isEmpty) {
+      // 상태만 초기화하고 종료
+      state = state.copyWith(unitType: null, isLoading: false, error: null);
+      return;
+    }
+
+    // 로딩 상태 시작 (기존 unitType과 error 초기화)
+    state = state.copyWith(
+      isLoading: true,
+      error: null,
+      unitType: null, // 조회 시작 시 기존 결과 완전 초기화
+    );
+
+    try {
+      // 약간의 지연을 추가하여 사용자 경험 개선 (선택사항)
+      await Future.delayed(Duration(milliseconds: 300));
+
+      // 실제 데이터에서 조회
+      final unitType = DongHosuTypeRawdata.getUnitType(dong, hosu);
+
+      // 조회 중에 사용자가 입력을 다시 변경했는지 확인
+      if (state.dong.trim() != dong || state.hosu.trim() != hosu) {
+        // 입력이 변경되었으면 현재 조회 결과 무시
+        return;
+      }
+
+      if (unitType != null) {
+        // 성공: 유닛 타입을 평형 형태로 변환
+
+        state = state.copyWith(
+          unitType: unitType,
+          isLoading: false,
+          error: null,
+        );
+      } else {
+        // 실패: 해당 동/호수 조합이 없음
+        state = state.copyWith(
+          unitType: null,
+          isLoading: false,
+          error: '입력하신 동/호수 정보를 찾을 수 없습니다.\n동과 호수를 다시 확인해주세요.',
+        );
+      }
+    } catch (e) {
+      // 예외 처리
+      state = state.copyWith(
+        unitType: null,
+        isLoading: false,
+        error: '조회 중 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.',
+      );
+    }
   }
 
-  // 임시 Mock 데이터 (나중에 Supabase로 대체)
-  String? _getMockUnitType(String dong, String hosu) {
-    final dongNum = int.tryParse(dong);
-    final hosuNum = int.tryParse(hosu);
+  /// 수동으로 유닛 타입 재조회
+  Future<void> refreshUnitType() async {
+    await _lookupUnitType();
+  }
 
-    if (dongNum == null || hosuNum == null) return null;
-
-    // 임시 매핑 로직 (실제로는 DB에서 조회)
-    if (dongNum >= 101 && dongNum <= 103) {
-      if (hosuNum >= 501 && hosuNum <= 510) return '61평형';
-      if (hosuNum >= 511 && hosuNum <= 520) return '63평형';
+  /// 입력 검증 및 다음 단계로 진행
+  Future<bool> validateAndProceed() async {
+    // 필수 필드 검증
+    if (state.dong.trim().isEmpty) {
+      state = state.copyWith(error: '동을 입력해주세요.');
+      return false;
     }
 
-    if (dongNum >= 104 && dongNum <= 106) {
-      if (hosuNum >= 501 && hosuNum <= 505) return '84A평형';
-      if (hosuNum >= 506 && hosuNum <= 510) return '84B평형';
-      if (hosuNum >= 511 && hosuNum <= 515) return '84C평형';
+    if (state.hosu.trim().isEmpty) {
+      state = state.copyWith(error: '호수를 입력해주세요.');
+      return false;
     }
 
-    return null; // 해당하는 평형이 없음
+    // 유닛 타입이 없으면 다시 조회 시도
+    if (state.unitType == null) {
+      await _lookupUnitType();
+
+      // 조회 후에도 유닛 타입이 없으면 실패
+      if (state.unitType == null) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /// 개발자용: 사용 가능한 동 목록 조회
+  List<String> getAvailableDongs() {
+    return DongHosuTypeRawdata.getAvailableDongs();
+  }
+
+  /// 개발자용: 특정 동의 사용 가능한 호수 목록 조회
+  List<String> getAvailableHosuByDong(String dong) {
+    return DongHosuTypeRawdata.getAvailableHosuByDong(dong);
+  }
+
+  /// 개발자용: 데이터 요약 정보 조회
+  Map<String, dynamic> getDataSummary() {
+    return DongHosuTypeRawdata.getDataSummary();
   }
 }
 
-// Provider
+/// Provider 정의
 final unitInputViewModelProvider =
-    StateNotifierProvider<UnitInputViewmodel, UnitInputState>((ref) {
-      return UnitInputViewmodel();
-    });
+    StateNotifierProvider<UnitInputViewModel, UnitInputState>(
+      (ref) => UnitInputViewModel(),
+    );
