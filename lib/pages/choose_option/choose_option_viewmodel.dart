@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/type_detail_option.dart';
 // rawdata.dart import 추가
 import '../../repositories/apartment_option_rawdata.dart';
+import '../quotation/quotation_viewmodel.dart';
 
 // State 클래스
 class ChooseOptionState {
@@ -49,16 +50,16 @@ class ChooseOptionState {
     this.availableOptions = const [],
     this.selectedOptions = const {},
     this.expandedOptions = const {},
-    this.basePrice = 0, // 1억 (임시)
+    this.basePrice = 0,
     this.selectedOptionsPrice = 0,
     this.totalPrice = 0,
     this.contractPrice = 0,
   });
 
   // 평형별 표시 여부 판단 헬퍼
-  bool get is84Type => unitType.contains('84'); // 84A, 84B, 84C평형
+  bool get is84Type => unitType.contains('84'); // 84A, 84B, 84C
   bool get is61or63Type =>
-      unitType.contains('61') || unitType.contains('63'); // 61, 63평형
+      unitType.contains('61') || unitType.contains('63'); // 61, 63
 
   // 발코니 확장 정보 표시용
   String get expansionTitle {
@@ -411,59 +412,67 @@ class ChooseOptionViewModel extends StateNotifier<ChooseOptionState> {
   }
 
   // 다음 단계로 진행 (견적서 확인)
-  Future<bool> proceedToNext() async {
+  Future<QuotationData?> proceedToNext() async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      print('=== 최종 선택 정보 ===');
-      print('📍 기본 정보:');
-      print('  - 동/호수: ${state.dong}동 ${state.hosu}호');
-      print('  - 평형: ${state.unitType}');
-      if (state.name != null && state.name!.isNotEmpty) {
-        print('  - 계약자: ${state.name}');
-      }
+      // 선택된 옵션 정보 수집
+      final selectedOptionInfos = <SelectedOptionInfo>[];
 
-      print('🏠 가변형 벽체 선택:');
-      if (state.is84Type) {
-        print('  - 침실 타입: ${state.bedroomType}');
-        print('  - 알파룸 타입: ${state.alphaRoomType}');
-      } else if (state.is61or63Type) {
-        print('  - 침실2 타입: ${state.bedroom2Type}');
-      }
-
-      print('🎯 선택된 옵션들:');
       for (final entry in state.selectedOptions.entries) {
         final optionId = entry.key;
         final detailIndex = entry.value;
 
-        if (detailIndex > 0) {
-          // 미선택이 아닌 경우만
-          final option = state.availableOptions.firstWhere(
-            (opt) => opt.id == optionId,
-          );
+        final option = state.availableOptions.firstWhere(
+          (opt) => opt.id == optionId,
+          orElse: () => OptionModel(id: optionId),
+        );
+
+        if (option.detailedOption != null &&
+            detailIndex < option.detailedOption!.length) {
           final selectedDetail = option.detailedOption![detailIndex];
-          print(
-            '  - ${option.desc}: ${selectedDetail.desc} (+${_formatPrice(selectedDetail.price)}원)',
+
+          selectedOptionInfos.add(
+            SelectedOptionInfo(
+              optionId: optionId,
+              optionTitle: option.desc ?? '옵션',
+              selectedDetailDesc: selectedDetail.desc,
+              selectedDetailPrice: selectedDetail.price,
+              selectedDetailIndex: detailIndex,
+            ),
           );
         }
       }
 
-      print('💰 가격 정보:');
-      print('  - 기본 분양가: ${_formatPrice(state.basePrice)}원');
-      print('  - 발코니 확장: +${_formatPrice(state.expansionPrice)}원');
-      print('  - 선택 옵션: +${_formatPrice(state.selectedOptionsPrice)}원');
-      print('  - 총 분양가: ${_formatPrice(state.totalPrice)}원');
-      print('  - 계약금 (10%): ${_formatPrice(state.contractPrice)}원');
-      print('========================');
+      // 견적서 데이터 생성
+      final quotationData = QuotationData(
+        dong: state.dong,
+        hosu: state.hosu,
+        name: state.name,
+        unitType: state.unitType,
+        bedroomType: state.bedroomType,
+        alphaRoomType: state.alphaRoomType,
+        bedroom2Type: state.bedroom2Type,
+        basePrice: state.basePrice,
+        expansionPrice: state.expansionPrice,
+        selectedOptionsPrice: state.selectedOptionsPrice,
+        totalPrice: state.totalPrice,
+        contractPrice: state.contractPrice,
+        selectedOptions: selectedOptionInfos,
+      );
+
+      // 디버깅용 출력
+      quotationData.printSummary();
 
       // 서버 전송 시뮬레이션
       await Future.delayed(const Duration(milliseconds: 500));
 
       state = state.copyWith(isLoading: false);
-      return true;
+      return quotationData;
     } catch (e) {
+      print('❌ 견적서 데이터 생성 오류: $e');
       state = state.copyWith(isLoading: false, error: '저장 중 오류가 발생했습니다.');
-      return false;
+      return null;
     }
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/type_detail_option.dart';
 import '../../utils/app_colors.dart';
+import '../quotation/quotation_view.dart';
 import 'choose_option_viewmodel.dart';
 
 class ChooseOptionView extends ConsumerStatefulWidget {
@@ -97,7 +98,7 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
       title: Column(
         children: [
           Text(
-            '${widget.dong}동 ${widget.hosu}호 ${widget.unitType}',
+            '${widget.dong}동 ${widget.hosu}호 ${widget.unitType}타입',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -1024,9 +1025,9 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
   }
 
   Future<void> _handleNextPressed() async {
-    final success = await ref.read(provider.notifier).proceedToNext();
+    final quotationData = await ref.read(provider.notifier).proceedToNext();
 
-    if (success && mounted) {
+    if (quotationData != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('✅ 선택 완료! 견적서 페이지로 이동합니다.'),
@@ -1035,7 +1036,13 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
         ),
       );
       // TODO: Navigate to final summary page
-      // GoRouter.of(context).go('/final-summary');
+
+      // 견적서 페이지로 이동
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => QuotationView(quotationData: quotationData),
+        ),
+      );
     }
   }
 
