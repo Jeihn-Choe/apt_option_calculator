@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/type_detail_option.dart';
 // rawdata.dart import 추가
 import '../../repositories/apartment_option_rawdata.dart';
 
@@ -22,9 +23,15 @@ class ChooseOptionState {
   // 발코니 확장 가격 (rawdata에서 가져옴)
   final int expansionPrice;
 
+  // 세부 옵션 관련
+  final List<OptionModel> availableOptions; // 사용 가능한 옵션들
+  final Map<int, int> selectedOptions; // 선택된 옵션들 (optionId -> detailIndex)
+  final Map<int, bool> expandedOptions; // 확장된 드롭다운들 (optionId -> isExpanded)
+
   // 가격 정보
   final int basePrice; // 기본 분양가
-  final int totalPrice; // 기본가 + 발코니확장가
+  final int selectedOptionsPrice; // 선택된 옵션들의 총 가격
+  final int totalPrice; // 기본가 + 발코니확장가 + 옵션가격
   final int contractPrice; // 계약금 (총액의 10%)
 
   const ChooseOptionState({
@@ -39,9 +46,13 @@ class ChooseOptionState {
     this.isLoading = false,
     this.error,
     this.expansionPrice = 0,
-    this.basePrice = 100000000, // 1억 (임시)
-    this.totalPrice = 100000000,
-    this.contractPrice = 10000000,
+    this.availableOptions = const [],
+    this.selectedOptions = const {},
+    this.expandedOptions = const {},
+    this.basePrice = 0, // 1억 (임시)
+    this.selectedOptionsPrice = 0,
+    this.totalPrice = 0,
+    this.contractPrice = 0,
   });
 
   // 평형별 표시 여부 판단 헬퍼
@@ -66,6 +77,52 @@ class ChooseOptionState {
     }
   }
 
+  // 옵션 관련 헬퍼 메소드들
+  int getSelectedDetailIndex(int optionId) {
+    return selectedOptions[optionId] ?? 0; // 기본값: 미선택 (index 0)
+  }
+
+  bool isOptionExpanded(int optionId) {
+    return expandedOptions[optionId] ?? false;
+  }
+
+  DetailedOptionModel? getSelectedDetail(int optionId) {
+    final option = availableOptions.firstWhere(
+      (opt) => opt.id == optionId,
+      orElse: () => OptionModel(id: optionId),
+    );
+
+    if (option.detailedOption == null || option.detailedOption!.isEmpty) {
+      return null;
+    }
+
+    final selectedIndex = getSelectedDetailIndex(optionId);
+    if (selectedIndex < option.detailedOption!.length) {
+      return option.detailedOption![selectedIndex];
+    }
+    return null;
+  }
+
+  String getOptionDisplayPrice(int optionId) {
+    final selectedDetail = getSelectedDetail(optionId);
+    if (selectedDetail == null || selectedDetail.price == 0) {
+      return "미선택";
+    }
+    return "+${_formatPrice(selectedDetail.price)}원";
+  }
+
+  bool isOptionSelected(int optionId) {
+    final selectedDetail = getSelectedDetail(optionId);
+    return selectedDetail != null && selectedDetail.price > 0;
+  }
+
+  String _formatPrice(int price) {
+    return price.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
+
   ChooseOptionState copyWith({
     String? dong,
     String? hosu,
@@ -78,7 +135,11 @@ class ChooseOptionState {
     bool? isLoading,
     String? error,
     int? expansionPrice,
+    List<OptionModel>? availableOptions,
+    Map<int, int>? selectedOptions,
+    Map<int, bool>? expandedOptions,
     int? basePrice,
+    int? selectedOptionsPrice,
     int? totalPrice,
     int? contractPrice,
   }) {
@@ -94,7 +155,11 @@ class ChooseOptionState {
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
       expansionPrice: expansionPrice ?? this.expansionPrice,
+      availableOptions: availableOptions ?? this.availableOptions,
+      selectedOptions: selectedOptions ?? this.selectedOptions,
+      expandedOptions: expandedOptions ?? this.expandedOptions,
       basePrice: basePrice ?? this.basePrice,
+      selectedOptionsPrice: selectedOptionsPrice ?? this.selectedOptionsPrice,
       totalPrice: totalPrice ?? this.totalPrice,
       contractPrice: contractPrice ?? this.contractPrice,
     );
@@ -195,7 +260,14 @@ class ChooseOptionViewModel extends StateNotifier<ChooseOptionState> {
 
   // 평형 타입 확정 해제 (필요시)
   void resetTypeSelection() {
-    state = state.copyWith(isTypeConfirmed: false);
+    state = state.copyWith(
+      isTypeConfirmed: false,
+      availableOptions: [],
+      selectedOptions: {},
+      expandedOptions: {},
+      selectedOptionsPrice: 0,
+    );
+    _recalculatePrice();
     print('🔄 평형 타입 확정 해제 - 다시 선택 가능');
   }
 
@@ -230,35 +302,99 @@ class ChooseOptionViewModel extends StateNotifier<ChooseOptionState> {
       print('  - Type: ${state.unitType}');
       print('  - bedSep: $bedSep');
       print('  - alphaSep: $alphaSep');
-      print('  - 옵션 개수: ${(apartmentData['option'] as List).length}');
 
-      // TODO: 여기서 옵션 리스트를 state에 저장하거나 다음 단계 처리
-      // 현재는 콘솔 출력으로만 확인
-      _printAvailableOptions(apartmentData['option'] as List);
+      // option 데이터를 OptionModel 리스트로 변환
+      final rawOptions = apartmentData['option'] as List;
+      final availableOptions = <OptionModel>[];
+
+      for (final rawOption in rawOptions) {
+        // desc가 null이 아닌 것만 추가
+        if (rawOption['desc'] != null) {
+          availableOptions.add(OptionModel.fromJson(rawOption));
+        }
+      }
+
+      print('  - 유효한 옵션 개수: ${availableOptions.length}');
+
+      state = state.copyWith(
+        availableOptions: availableOptions,
+        selectedOptions: {}, // 선택 초기화
+        expandedOptions: {}, // 확장 상태 초기화
+        selectedOptionsPrice: 0,
+      );
+
+      _recalculatePrice();
     } else {
       print('❌ 해당 조건의 옵션 데이터를 찾을 수 없습니다.');
       state = state.copyWith(error: '해당 조건의 옵션 데이터를 찾을 수 없습니다.');
     }
   }
 
-  // 사용 가능한 옵션들 출력 (디버깅용)
-  void _printAvailableOptions(List<dynamic> options) {
-    print('🛠️ 사용 가능한 옵션들:');
-    for (final option in options) {
-      if (option['desc'] != null) {
-        print('  - ${option['desc']}');
-        final detailedOptions = option['detailedOption'] as List?;
-        if (detailedOptions != null) {
-          for (final detail in detailedOptions) {
-            if (detail['desc'] != "미선택" && detail['price'] > 0) {
-              print(
-                '    • ${detail['desc']}: +${_formatPrice(detail['price'])}원',
-              );
-            }
-          }
-        }
+  // 드롭다운 토글
+  void toggleOptionExpansion(int optionId) {
+    final currentExpanded = state.expandedOptions[optionId] ?? false;
+    final newExpandedOptions = Map<int, bool>.from(state.expandedOptions);
+    newExpandedOptions[optionId] = !currentExpanded;
+
+    state = state.copyWith(expandedOptions: newExpandedOptions);
+  }
+
+  // 세부 옵션 선택
+  void selectDetailOption(int optionId, int detailIndex) {
+    final newSelectedOptions = Map<int, int>.from(state.selectedOptions);
+    newSelectedOptions[optionId] = detailIndex;
+
+    state = state.copyWith(selectedOptions: newSelectedOptions);
+
+    // 선택 후 드롭다운 자동 닫기
+    final newExpandedOptions = Map<int, bool>.from(state.expandedOptions);
+    newExpandedOptions[optionId] = false;
+    state = state.copyWith(expandedOptions: newExpandedOptions);
+
+    _recalculatePrice();
+
+    final option = state.availableOptions.firstWhere(
+      (opt) => opt.id == optionId,
+    );
+    final selectedDetail = option.detailedOption![detailIndex];
+    print(
+      '✅ 옵션 선택: ${option.desc} -> ${selectedDetail.desc} (+${_formatPrice(selectedDetail.price)}원)',
+    );
+  }
+
+  // 옵션 선택 해제
+  void clearOption(int optionId) {
+    selectDetailOption(optionId, 0); // 0번 인덱스는 "미선택"
+  }
+
+  // 가격 재계산
+  void _recalculatePrice() {
+    int selectedOptionsPrice = 0;
+
+    for (final entry in state.selectedOptions.entries) {
+      final optionId = entry.key;
+      final detailIndex = entry.value;
+
+      final option = state.availableOptions.firstWhere(
+        (opt) => opt.id == optionId,
+        orElse: () => OptionModel(id: optionId),
+      );
+
+      if (option.detailedOption != null &&
+          detailIndex < option.detailedOption!.length) {
+        selectedOptionsPrice += option.detailedOption![detailIndex].price;
       }
     }
+
+    final totalPrice =
+        state.basePrice + state.expansionPrice + selectedOptionsPrice;
+    final contractPrice = (totalPrice * 0.1).round();
+
+    state = state.copyWith(
+      selectedOptionsPrice: selectedOptionsPrice,
+      totalPrice: totalPrice,
+      contractPrice: contractPrice,
+    );
   }
 
   // 가격 포맷팅 (천 단위 콤마)
@@ -295,9 +431,27 @@ class ChooseOptionViewModel extends StateNotifier<ChooseOptionState> {
         print('  - 침실2 타입: ${state.bedroom2Type}');
       }
 
+      print('🎯 선택된 옵션들:');
+      for (final entry in state.selectedOptions.entries) {
+        final optionId = entry.key;
+        final detailIndex = entry.value;
+
+        if (detailIndex > 0) {
+          // 미선택이 아닌 경우만
+          final option = state.availableOptions.firstWhere(
+            (opt) => opt.id == optionId,
+          );
+          final selectedDetail = option.detailedOption![detailIndex];
+          print(
+            '  - ${option.desc}: ${selectedDetail.desc} (+${_formatPrice(selectedDetail.price)}원)',
+          );
+        }
+      }
+
       print('💰 가격 정보:');
       print('  - 기본 분양가: ${_formatPrice(state.basePrice)}원');
       print('  - 발코니 확장: +${_formatPrice(state.expansionPrice)}원');
+      print('  - 선택 옵션: +${_formatPrice(state.selectedOptionsPrice)}원');
       print('  - 총 분양가: ${_formatPrice(state.totalPrice)}원');
       print('  - 계약금 (10%): ${_formatPrice(state.contractPrice)}원');
       print('========================');

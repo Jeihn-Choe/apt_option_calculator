@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/type_detail_option.dart';
 import '../../utils/app_colors.dart';
 import 'choose_option_viewmodel.dart';
 
@@ -59,8 +60,8 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
                   // 가변형 벽체 선택 섹션
                   _buildTypeSelection(state),
 
-                  // 세부 옵션 섹션 (나중에 구현)
-                  if (state.isTypeConfirmed) _buildOptionsPlaceholder(),
+                  // 세부 옵션 섹션
+                  if (state.isTypeConfirmed) _buildDetailOptionsSection(state),
 
                   // 견적서 확인 버튼
                   _buildNextButtonContainer(state),
@@ -558,11 +559,10 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
     );
   }
 
-  // 옵션 섹션 플레이스홀더 (나중에 구현)
-  Widget _buildOptionsPlaceholder() {
+  // 세부 옵션 섹션
+  Widget _buildDetailOptionsSection(ChooseOptionState state) {
     return Container(
       margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.cleanWhite,
         borderRadius: BorderRadius.circular(16),
@@ -576,46 +576,270 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
       ),
       child: Column(
         children: [
+          // 헤더
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.lightBeige,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.construction,
-                  color: AppColors.primaryMedium,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '세부 옵션 선택',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryDark,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '가변형 벽체가 확정되었습니다.\n세부 옵션 선택 기능을 준비 중입니다.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.primaryLight,
-                        ),
-                      ),
-                    ],
+                const Expanded(
+                  child: Text(
+                    '세부 옵션 선택',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryDark,
+                    ),
                   ),
+                ),
+                Text(
+                  '원하는 옵션을 선택해주세요 (다중 선택 가능)',
+                  style: TextStyle(fontSize: 12, color: AppColors.primaryLight),
                 ),
               ],
             ),
           ),
+
+          // 옵션 목록
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              children: state.availableOptions.map((option) {
+                return _buildOptionCard(state, option);
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 개별 옵션 카드
+  Widget _buildOptionCard(ChooseOptionState state, OptionModel option) {
+    final isSelected = state.isOptionSelected(option.id);
+    final isExpanded = state.isOptionExpanded(option.id);
+    final displayPrice = state.getOptionDisplayPrice(option.id);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: isSelected ? AppColors.luxuryGold : AppColors.lightBeige,
+          width: isSelected ? 2 : 1,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: AppColors.luxuryGold.withValues(alpha: 0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : [],
+      ),
+      child: Column(
+        children: [
+          // 옵션 헤더
+          GestureDetector(
+            onTap: () =>
+                ref.read(provider.notifier).toggleOptionExpansion(option.id),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  // 옵션 내용
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              option.desc ?? '옵션',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.primaryDark,
+                              ),
+                            ),
+                            Text(
+                              displayPrice,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? AppColors.luxuryGold
+                                    : AppColors.primaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // 선택된 옵션 설명 표시
+                        if (isSelected) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            state.getSelectedDetail(option.id)?.desc ?? '',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primaryLight,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  // 드롭다운 버튼
+                  Container(
+                    width: 24,
+                    height: 24,
+                    margin: const EdgeInsets.only(left: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Transform.rotate(
+                      angle: isExpanded ? 3.14159 : 0, // 180도 회전
+                      child: const Icon(
+                        Icons.keyboard_arrow_down,
+                        color: AppColors.cleanWhite,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 세부 옵션 드롭다운
+          if (isExpanded && option.detailedOption != null) ...[
+            Container(
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.lightBeige)),
+              ),
+              child: Column(
+                children: [
+                  // 세부 옵션 헤더
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    color: AppColors.lightBeige.withValues(alpha: 0.5),
+                    child: const Row(
+                      children: [
+                        Text(
+                          '세부 옵션 선택',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.primaryMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 세부 옵션 목록
+                  ...option.detailedOption!.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final detail = entry.value;
+                    final isDetailSelected =
+                        state.getSelectedDetailIndex(option.id) == index;
+
+                    return GestureDetector(
+                      onTap: () => ref
+                          .read(provider.notifier)
+                          .selectDetailOption(option.id, index),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        color: isDetailSelected
+                            ? AppColors.luxuryGold.withValues(alpha: 0.1)
+                            : null,
+                        child: Row(
+                          children: [
+                            // 라디오 버튼
+                            Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isDetailSelected
+                                      ? AppColors.luxuryGold
+                                      : AppColors.primaryLight,
+                                  width: 2,
+                                ),
+                              ),
+                              child: isDetailSelected
+                                  ? Center(
+                                      child: Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: AppColors.luxuryGold,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+
+                            // 옵션 설명
+                            Expanded(
+                              child: Text(
+                                detail.desc,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDetailSelected
+                                      ? AppColors.luxuryGold
+                                      : AppColors.primaryMedium,
+                                  fontWeight: isDetailSelected
+                                      ? FontWeight.w500
+                                      : FontWeight.normal,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+
+                            // 가격
+                            Text(
+                              detail.price == 0
+                                  ? '무료'
+                                  : '+${_formatPrice(detail.price)}원',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: detail.price == 0
+                                    ? AppColors.primaryLight
+                                    : (isDetailSelected
+                                          ? AppColors.luxuryGold
+                                          : AppColors.primaryMedium),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -704,6 +928,52 @@ class _ChooseOptionViewState extends ConsumerState<ChooseOptionView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (state.selectedOptionsPrice > 0) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '발코니 확장',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.cleanWhite,
+                    ),
+                  ),
+                  Text(
+                    '${_formatPrice(state.expansionPrice)}원',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.cleanWhite,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '선택 옵션',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.cleanWhite,
+                    ),
+                  ),
+                  Text(
+                    '${_formatPrice(state.selectedOptionsPrice)}원',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.cleanWhite,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
