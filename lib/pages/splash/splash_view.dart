@@ -70,6 +70,7 @@ class _SplashViewState extends ConsumerState<SplashView>
   void dispose() {
     _fadeController.dispose();
     _scaleController.dispose();
+    super.dispose();
   }
 
   @override

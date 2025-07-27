@@ -1,20 +1,19 @@
-// State 클래스
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+// State 클래스
 class UnitInputState {
   final String dong;
   final String hosu;
   final String? name;
-  final String? unitType;
+  final String? unitType; // 조회 성공 시에만 설정
   final bool isLoading;
   final String? error;
-  final bool canProceed;
-
+  final bool canProceed; // 입력만 완료되면 true
 
   const UnitInputState({
     this.dong = '',
     this.hosu = '',
-    this.name = '',
+    this.name,
     this.unitType,
     this.isLoading = false,
     this.error,
@@ -24,6 +23,7 @@ class UnitInputState {
   UnitInputState copyWith({
     String? dong,
     String? hosu,
+    String? name,
     String? unitType,
     bool? isLoading,
     String? error,
@@ -32,6 +32,7 @@ class UnitInputState {
     return UnitInputState(
       dong: dong ?? this.dong,
       hosu: hosu ?? this.hosu,
+      name: name ?? this.name,
       unitType: unitType ?? this.unitType,
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
@@ -41,75 +42,90 @@ class UnitInputState {
 }
 
 // ViewModel 클래스
-class UnitInputViewModel extends StateNotifier<UnitInputState> {
-  UnitInputViewModel() : super(const UnitInputState());
+class UnitInputViewmodel extends StateNotifier<UnitInputState> {
+  UnitInputViewmodel() : super(const UnitInputState());
 
-  // 입력 업데이트
-  void updateInput(String dong, String hosu) {
+  // 개별 업데이트 메서드들
+  void updateDong(String dong) {
     state = state.copyWith(
       dong: dong,
-      hosu: hosu,
-      error: null, // 입력 변경 시 에러 초기화
+      error: null, // 입력 시 에러 초기화
+      unitType: null, // 입력 변경 시 이전 조회 결과 초기화
     );
-
-    // 자동으로 평형 타입 찾기 (둘 다 입력된 경우)
-    if (dong.isNotEmpty && hosu.isNotEmpty) {
-      _autoFindUnitType(dong, hosu);
-    } else {
-      state = state.copyWith(unitType: null, canProceed: false);
-    }
+    _updateCanProceed();
   }
 
-  // 평형 타입 찾기 (사용자가 버튼 클릭)
-  Future<void> findUnitType(String dong, String hosu) async {
+  void updateHosu(String hosu) {
+    state = state.copyWith(hosu: hosu, error: null, unitType: null);
+    _updateCanProceed();
+  }
+
+  void updateName(String name) {
+    state = state.copyWith(name: name, error: null);
+  }
+
+  // 진행 가능 여부 업데이트 (입력만 체크)
+  void _updateCanProceed() {
+    final canProceed = state.dong.isNotEmpty && state.hosu.isNotEmpty;
+    // unitType 체크 제거!
+
+    state = state.copyWith(canProceed: canProceed);
+  }
+
+  // 🔥 새로운 메서드: 계속하기 버튼 클릭 시 호출
+  Future<bool> validateAndProceed() async {
+    if (!state.canProceed) return false;
+
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // 여기서 실제로는 Supabase에서 조회할 예정
-      // 지금은 임시 로직으로 처리
-      await Future.delayed(const Duration(milliseconds: 500));
+      // DB 조회 시뮬레이션
+      await Future.delayed(const Duration(milliseconds: 800));
 
-      final unitType = _getMockUnitType(dong, hosu);
+      final unitType = _getMockUnitType(state.dong, state.hosu);
 
       if (unitType != null) {
+        // ✅ 성공: 평형 정보 설정
         state = state.copyWith(
           isLoading: false,
           unitType: unitType,
-          canProceed: true,
+          error: null,
         );
 
-        // 여기서 다음 페이지로 이동 로직 추가
-        // GoRouter.of(context).go('/option-selection');
-        print('다음 페이지로 이동: $dong동 $hosu호 ($unitType 타입)');
+        print('✅ 조회 성공: ${state.dong}동 ${state.hosu}호 ($unitType 타입)');
+        return true; // 다음 페이지로 이동 가능
       } else {
+        // ❌ 실패: 에러 메시지 설정
         state = state.copyWith(
           isLoading: false,
           error: '해당 동/호수 정보를 찾을 수 없습니다.\n입력하신 정보를 다시 확인해주세요.',
-          canProceed: false,
+          unitType: null,
         );
+
+        print('❌ 조회 실패: ${state.dong}동 ${state.hosu}호');
+        return false; // 현재 페이지에 머물기
       }
     } catch (e) {
+      // 🔥 네트워크/서버 에러
       state = state.copyWith(
         isLoading: false,
-        error: '정보를 조회하는 중 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.',
-        canProceed: false,
+        error: '서버 연결에 실패했습니다.\n잠시 후 다시 시도해주세요.',
+        unitType: null,
       );
+
+      print('🔥 서버 에러: $e');
+      return false;
     }
   }
 
-  // 자동 평형 타입 찾기 (실시간)
-  void _autoFindUnitType(String dong, String hosu) {
-    final unitType = _getMockUnitType(dong, hosu);
+  // 에러 메시지 초기화
+  void clearError() {
+    state = state.copyWith(error: null);
+  }
 
-    if (unitType != null) {
-      state = state.copyWith(unitType: unitType, canProceed: true, error: null);
-    } else {
-      state = state.copyWith(
-        unitType: null,
-        canProceed: false,
-        error: null, // 자동 조회에서는 에러 표시 안함
-      );
-    }
+  // 입력 초기화 (필요시)
+  void reset() {
+    state = const UnitInputState();
   }
 
   // 임시 Mock 데이터 (나중에 Supabase로 대체)
@@ -137,6 +153,6 @@ class UnitInputViewModel extends StateNotifier<UnitInputState> {
 
 // Provider
 final unitInputViewModelProvider =
-    StateNotifierProvider<UnitInputViewModel, UnitInputState>((ref) {
-      return UnitInputViewModel();
+    StateNotifierProvider<UnitInputViewmodel, UnitInputState>((ref) {
+      return UnitInputViewmodel();
     });
